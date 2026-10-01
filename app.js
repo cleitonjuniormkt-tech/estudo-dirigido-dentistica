@@ -25,6 +25,7 @@ let S = {
 
 let timerH = null;
 let saiu = false;
+let finalizando = false;
 
 
 /* =========================================================
@@ -37,17 +38,34 @@ function salvarLocal() {
   } catch (e) {}
 }
 
+
 function carregarLocal() {
   try {
+
     const j = localStorage.getItem(KEY);
 
     if (j) {
-      S = Object.assign(S, JSON.parse(j));
+      const salvo = JSON.parse(j);
+
+      S = Object.assign({
+        aluno: null,
+        tid: null,
+        inicio: 0,
+        limite: 0,
+        resp: {},
+        cur: 0,
+        fim: false,
+        resultado: null,
+        pend: []
+      }, salvo);
     }
+
   } catch (e) {}
 }
 
+
 function limparLocal() {
+
   try {
     localStorage.removeItem(KEY);
   } catch (e) {}
@@ -76,25 +94,34 @@ async function api(action, data = {}) {
     throw new Error("backend_nao_configurado");
   }
 
-  const r = await fetch(CONFIG.API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8"
-    },
-    body: JSON.stringify(
-      Object.assign(
-        {
-          action
-        },
-        data
-      )
-    )
-  });
+  const r = await fetch(
+    CONFIG.API_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        action,
+        ...data
+      })
+    }
+  );
 
-  const j = await r.json();
+  let j;
+
+  try {
+    j = await r.json();
+  } catch (e) {
+    throw new Error("Resposta inválida do servidor.");
+  }
 
   if (j && j.ok === false) {
-    throw new Error(j.erro || j.mensagem || "erro_api");
+    throw new Error(
+      j.erro ||
+      j.mensagem ||
+      "erro_api"
+    );
   }
 
   return j;
@@ -115,7 +142,7 @@ async function enviar(action, data) {
 
   salvarLocal();
 
-  flush();
+  await flush();
 }
 
 
@@ -135,7 +162,10 @@ async function flush() {
 
     try {
 
-      await api(item.action, item.data);
+      await api(
+        item.action,
+        item.data
+      );
 
     } catch (e) {
 
@@ -178,12 +208,28 @@ function evento(tipo, detalhe = {}) {
 
 function esconderTodas() {
 
-  $("s-id").classList.add("hidden");
-  $("s-termos").classList.add("hidden");
-  $("s-prova").classList.add("hidden");
-  $("s-res").classList.add("hidden");
+  const ids = [
+    "s-id",
+    "s-termos",
+    "s-prova",
+    "s-res"
+  ];
 
-  $("barra").classList.add("hidden");
+  ids.forEach(id => {
+
+    const el = $(id);
+
+    if (el) {
+      el.classList.add("hidden");
+    }
+
+  });
+
+  const barra = $("barra");
+
+  if (barra) {
+    barra.classList.add("hidden");
+  }
 }
 
 
@@ -191,19 +237,61 @@ function mostrarIdentificacao() {
 
   esconderTodas();
 
-  $("s-id").classList.remove("hidden");
+  const tela = $("s-id");
 
-  $("barra").classList.add("hidden");
+  if (tela) {
+    tela.classList.remove("hidden");
+  }
 
-  $("erroId").textContent = "";
-  $("erroLogin").textContent = "";
+  const barra = $("barra");
 
-  $("loginEmail").value = "";
-  $("loginMatricula").value = "";
+  if (barra) {
+    barra.classList.add("hidden");
+  }
 
-  $("nome").value = "";
-  $("email").value = "";
-  $("matricula").value = "";
+  const erroId = $("erroId");
+
+  if (erroId) {
+    erroId.textContent = "";
+  }
+
+  const erroLogin = $("erroLogin");
+
+  if (erroLogin) {
+    erroLogin.textContent = "";
+  }
+
+  const loginEmail = $("loginEmail");
+
+  if (loginEmail) {
+    loginEmail.value = "";
+  }
+
+  const loginMatricula = $("loginMatricula");
+
+  if (loginMatricula) {
+    loginMatricula.value = "";
+  }
+
+  const nome = $("nome");
+
+  if (nome) {
+    nome.value = "";
+  }
+
+  const email = $("email");
+
+  if (email) {
+    email.value = "";
+  }
+
+  const matricula = $("matricula");
+
+  if (matricula) {
+    matricula.value = "";
+  }
+
+  document.body.classList.remove("noselect");
 }
 
 
@@ -211,12 +299,29 @@ function mostrarTermos() {
 
   esconderTodas();
 
-  $("s-termos").classList.remove("hidden");
+  const tela = $("s-termos");
 
-  $("aceite").checked = false;
-  $("btnIniciar").disabled = true;
+  if (tela) {
+    tela.classList.remove("hidden");
+  }
 
-  $("erroTermos").textContent = "";
+  const aceite = $("aceite");
+
+  if (aceite) {
+    aceite.checked = false;
+  }
+
+  const btn = $("btnIniciar");
+
+  if (btn) {
+    btn.disabled = true;
+  }
+
+  const erro = $("erroTermos");
+
+  if (erro) {
+    erro.textContent = "";
+  }
 }
 
 
@@ -226,44 +331,93 @@ function mostrarTermos() {
 
 async function continuarIdentificacao() {
 
-  const nome = $("nome").value.trim();
-  const email = $("email").value.trim().toLowerCase();
-  const matricula = $("matricula").value.trim();
+  const nome =
+    ($("nome")?.value || "").trim();
 
-  $("erroId").textContent = "";
+  const email =
+    ($("email")?.value || "")
+      .trim()
+      .toLowerCase();
+
+  const matricula =
+    ($("matricula")?.value || "").trim();
+
+  const erro =
+    $("erroId");
+
+  if (erro) {
+    erro.textContent = "";
+  }
 
   if (!nome) {
-    $("erroId").textContent = "Informe seu nome completo.";
+
+    if (erro) {
+      erro.textContent =
+        "Informe seu nome completo.";
+    }
+
     return;
   }
 
   if (!email || !email.includes("@")) {
-    $("erroId").textContent = "Informe um e-mail válido.";
+
+    if (erro) {
+      erro.textContent =
+        "Informe um e-mail válido.";
+    }
+
     return;
   }
 
   if (!matricula) {
-    $("erroId").textContent = "Informe sua matrícula.";
+
+    if (erro) {
+      erro.textContent =
+        "Informe sua matrícula.";
+    }
+
     return;
   }
 
-  $("btnContinuar").disabled = true;
-  $("btnContinuar").textContent = "VERIFICANDO...";
+  const botao =
+    $("btnContinuar");
+
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = "VERIFICANDO...";
+  }
 
   try {
 
-    const r = await api(
-      "verificar_prova",
-      {
-        codigo_prova: CONFIG.CODIGO_PROVA
-      }
-    );
+    const r =
+      await api(
+        "verificar_prova",
+        {
+          codigo_prova:
+            CONFIG.CODIGO_PROVA
+        }
+      );
 
-    if (!r.ok && r.ativa === false) {
+    if (
+      !r ||
+      r.ok === false ||
+      r.ativa === false
+    ) {
+
       throw new Error(
-        r.mensagem || "Esta prova não está disponível."
+        r?.mensagem ||
+        "Esta prova não está disponível."
       );
     }
+
+    /*
+     * Importante:
+     * começamos uma NOVA sessão local.
+     * Isso impede que dados de outro aluno
+     * sejam misturados.
+     */
+
+    limparLocal();
 
     S.aluno = {
       nome,
@@ -277,13 +431,17 @@ async function continuarIdentificacao() {
 
   } catch (e) {
 
-    $("erroId").textContent =
-      mensagemErro(e);
+    if (erro) {
+      erro.textContent =
+        mensagemErro(e);
+    }
 
   } finally {
 
-    $("btnContinuar").disabled = false;
-    $("btnContinuar").textContent = "CONTINUAR";
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = "CONTINUAR";
+    }
   }
 }
 
@@ -294,63 +452,108 @@ async function continuarIdentificacao() {
 
 async function entrarAluno() {
 
-  const email = $("loginEmail").value.trim().toLowerCase();
-  const matricula = $("loginMatricula").value.trim();
+  const email =
+    ($("loginEmail")?.value || "")
+      .trim()
+      .toLowerCase();
 
-  $("erroLogin").textContent = "";
+  const matricula =
+    ($("loginMatricula")?.value || "").trim();
+
+  const erro =
+    $("erroLogin");
+
+  if (erro) {
+    erro.textContent = "";
+  }
 
   if (!email || !email.includes("@")) {
-    $("erroLogin").textContent =
-      "Informe um e-mail válido.";
+
+    if (erro) {
+      erro.textContent =
+        "Informe um e-mail válido.";
+    }
 
     return;
   }
 
   if (!matricula) {
-    $("erroLogin").textContent =
-      "Informe sua matrícula.";
+
+    if (erro) {
+      erro.textContent =
+        "Informe sua matrícula.";
+    }
 
     return;
   }
 
-  $("btnEntrar").disabled = true;
-  $("btnEntrar").textContent = "RECUPERANDO...";
+  const botao =
+    $("btnEntrar");
+
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = "RECUPERANDO...";
+  }
 
   try {
 
-    const r = await api(
-      "entrar_aluno",
-      {
-        codigo_prova: CONFIG.CODIGO_PROVA,
-        email,
-        matricula
-      }
-    );
+    const r =
+      await api(
+        "entrar_aluno",
+        {
+          codigo_prova:
+            CONFIG.CODIGO_PROVA,
+          email,
+          matricula
+        }
+      );
 
     if (!r || !r.tipo) {
+
       throw new Error(
-        r?.mensagem || "Não foi possível recuperar a tentativa."
+        r?.mensagem ||
+        "Não foi possível recuperar a tentativa."
       );
     }
 
 
-    /* -----------------------------------------
+    /* =====================================================
        TENTATIVA EM ANDAMENTO
-       ----------------------------------------- */
+       ===================================================== */
 
     if (r.tipo === "retomar") {
 
+      limparLocal();
+
       S.aluno = {
         nome: r.nome,
         email: r.email,
         matricula: r.matricula
       };
 
-      S.tid = r.tentativa_id;
-      S.inicio = Number(r.inicio_ts || Date.now());
-      S.limite = Number(r.tempo_limite || 7200);
-      S.resp = r.respostas || {};
-      S.cur = Number(r.primeira_questao || 0);
+      S.tid =
+        r.tentativa_id;
+
+      S.inicio =
+        Number(
+          r.inicio_ts ||
+          Date.now()
+        );
+
+      S.limite =
+        Number(
+          r.tempo_limite ||
+          7200
+        );
+
+      S.resp =
+        r.respostas || {};
+
+      S.cur =
+        Number(
+          r.primeira_questao || 0
+        );
+
       S.fim = false;
       S.resultado = null;
       S.pend = [];
@@ -359,29 +562,49 @@ async function entrarAluno() {
 
       iniciarProva();
 
-      flush();
+      await flush();
 
       return;
     }
 
 
-    /* -----------------------------------------
+    /* =====================================================
        TEMPO ESGOTADO
-       ----------------------------------------- */
+       ===================================================== */
 
     if (r.tipo === "tempo_esgotado") {
 
+      limparLocal();
+
       S.aluno = {
         nome: r.nome,
         email: r.email,
         matricula: r.matricula
       };
 
-      S.tid = r.tentativa_id;
-      S.inicio = Number(r.inicio_ts || Date.now());
-      S.limite = Number(r.tempo_limite || 7200);
-      S.resp = r.respostas || {};
-      S.cur = Number(r.primeira_questao || 0);
+      S.tid =
+        r.tentativa_id;
+
+      S.inicio =
+        Number(
+          r.inicio_ts ||
+          Date.now()
+        );
+
+      S.limite =
+        Number(
+          r.tempo_limite ||
+          7200
+        );
+
+      S.resp =
+        r.respostas || {};
+
+      S.cur =
+        Number(
+          r.primeira_questao || 0
+        );
+
       S.fim = false;
       S.resultado = null;
       S.pend = [];
@@ -390,21 +613,31 @@ async function entrarAluno() {
 
       iniciarProva();
 
-      setTimeout(() => {
-        if (!S.fim && S.tid) {
-          finalizar(true);
-        }
-      }, 100);
+      setTimeout(
+        () => {
+
+          if (
+            !S.fim &&
+            S.tid
+          ) {
+            finalizar(true);
+          }
+
+        },
+        100
+      );
 
       return;
     }
 
 
-    /* -----------------------------------------
+    /* =====================================================
        RESULTADO FINALIZADO
-       ----------------------------------------- */
+       ===================================================== */
 
     if (r.tipo === "resultado") {
+
+      limparLocal();
 
       S.aluno = {
         nome: r.nome,
@@ -412,13 +645,30 @@ async function entrarAluno() {
         matricula: r.matricula
       };
 
-      S.tid = r.tentativa_id;
-      S.inicio = Number(r.inicio_ts || 0);
-      S.limite = Number(r.tempo_limite || 7200);
-      S.resp = r.respostas || {};
+      S.tid =
+        r.tentativa_id;
+
+      S.inicio =
+        Number(
+          r.inicio_ts || 0
+        );
+
+      S.limite =
+        Number(
+          r.tempo_limite ||
+          7200
+        );
+
+      S.resp =
+        r.respostas || {};
+
       S.cur = 0;
+
       S.fim = true;
-      S.resultado = r.resultado || null;
+
+      S.resultado =
+        r.resultado || null;
+
       S.pend = [];
 
       salvarLocal();
@@ -430,18 +680,24 @@ async function entrarAluno() {
 
 
     throw new Error(
-      r.mensagem || "Tentativa não encontrada."
+      r.mensagem ||
+      "Tentativa não encontrada."
     );
 
   } catch (e) {
 
-    $("erroLogin").textContent =
-      mensagemErro(e);
+    if (erro) {
+      erro.textContent =
+        mensagemErro(e);
+    }
 
   } finally {
 
-    $("btnEntrar").disabled = false;
-    $("btnEntrar").textContent = "ENTRAR E RECUPERAR";
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent =
+        "ENTRAR E RECUPERAR";
+    }
   }
 }
 
@@ -452,52 +708,103 @@ async function entrarAluno() {
 
 async function iniciarNovaTentativa() {
 
-  $("erroTermos").textContent = "";
+  const erro =
+    $("erroTermos");
 
-  if (!$("aceite").checked) {
+  if (erro) {
+    erro.textContent = "";
+  }
 
-    $("erroTermos").textContent =
-      "Você precisa aceitar os termos para iniciar.";
+  const aceite =
+    $("aceite")?.checked;
+
+  if (!aceite) {
+
+    if (erro) {
+      erro.textContent =
+        "Você precisa aceitar os termos para iniciar.";
+    }
 
     return;
   }
 
   if (!S.aluno) {
 
-    $("erroTermos").textContent =
-      "Identificação não encontrada.";
+    if (erro) {
+      erro.textContent =
+        "Identificação não encontrada.";
+    }
 
     return;
   }
 
-  $("btnIniciar").disabled = true;
-  $("btnIniciar").textContent = "INICIANDO...";
+  const botao =
+    $("btnIniciar");
+
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = "INICIANDO...";
+  }
 
   try {
 
-    const r = await api(
-      "iniciar_tentativa",
-      {
-        codigo_prova: CONFIG.CODIGO_PROVA,
-        nome: S.aluno.nome,
-        email: S.aluno.email,
-        matricula: S.aluno.matricula,
-        aceite: true,
-        versao_termos: CONFIG.VERSAO_TERMOS
-      }
-    );
+    const r =
+      await api(
+        "iniciar_tentativa",
+        {
+          codigo_prova:
+            CONFIG.CODIGO_PROVA,
 
-    if (!r || !r.tentativa_id) {
+          nome:
+            S.aluno.nome,
+
+          email:
+            S.aluno.email,
+
+          matricula:
+            S.aluno.matricula,
+
+          aceite: true,
+
+          versao_termos:
+            CONFIG.VERSAO_TERMOS
+        }
+      );
+
+    if (
+      !r ||
+      !r.tentativa_id
+    ) {
+
       throw new Error(
-        r?.mensagem || "Não foi possível iniciar a tentativa."
+        r?.mensagem ||
+        "Não foi possível iniciar a tentativa."
       );
     }
 
-    S.tid = r.tentativa_id;
-    S.inicio = Number(r.inicio_ts || Date.now());
-    S.limite = Number(r.tempo_limite || 7200);
-    S.resp = r.respostas || {};
-    S.cur = Number(r.primeira_questao || 0);
+    S.tid =
+      r.tentativa_id;
+
+    S.inicio =
+      Number(
+        r.inicio_ts ||
+        Date.now()
+      );
+
+    S.limite =
+      Number(
+        r.tempo_limite ||
+        7200
+      );
+
+    S.resp =
+      r.respostas || {};
+
+    S.cur =
+      Number(
+        r.primeira_questao || 0
+      );
+
     S.fim = false;
     S.resultado = null;
     S.pend = [];
@@ -508,14 +815,18 @@ async function iniciarNovaTentativa() {
 
   } catch (e) {
 
-    $("erroTermos").textContent =
-      mensagemErro(e);
+    if (erro) {
+      erro.textContent =
+        mensagemErro(e);
+    }
 
   } finally {
 
-    $("btnIniciar").disabled = false;
-    $("btnIniciar").textContent =
-      "ACEITAR E INICIAR PROVA";
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent =
+        "ACEITAR E INICIAR PROVA";
+    }
   }
 }
 
@@ -528,10 +839,11 @@ function iniciarProva() {
 
   esconderTodas();
 
-  $("s-prova").classList.remove("hidden");
-  $("barra").classList.remove("hidden");
+  $("s-prova")?.classList.remove("hidden");
+  $("barra")?.classList.remove("hidden");
 
   saiu = false;
+  finalizando = false;
 
   document.body.classList.add("noselect");
 
@@ -543,10 +855,11 @@ function iniciarProva() {
     clearInterval(timerH);
   }
 
-  timerH = setInterval(
-    tick,
-    1000
-  );
+  timerH =
+    setInterval(
+      tick,
+      1000
+    );
 
   flush();
 }
@@ -558,17 +871,28 @@ function iniciarProva() {
 
 function tick() {
 
-  if (!S.tid || S.fim) {
+  if (
+    !S.tid ||
+    S.fim ||
+    finalizando
+  ) {
     return;
   }
 
-  const agora = Date.now();
+  const agora =
+    Date.now();
 
   const inicio =
-    Number(S.inicio || agora);
+    Number(
+      S.inicio ||
+      agora
+    );
 
   const limite =
-    Number(S.limite || 7200) * 1000;
+    Number(
+      S.limite ||
+      7200
+    ) * 1000;
 
   const decorrido =
     agora - inicio;
@@ -579,8 +903,15 @@ function tick() {
       limite - decorrido
     );
 
-  $("timer").textContent =
-    "⏱ " + formatarTempo(restante);
+  const timer =
+    $("timer");
+
+  if (timer) {
+
+    timer.textContent =
+      "⏱ " +
+      formatarTempo(restante);
+  }
 
   if (restante <= 0) {
 
@@ -599,14 +930,20 @@ function formatarTempo(ms) {
   const total =
     Math.max(
       0,
-      Math.floor(ms / 1000)
+      Math.floor(
+        ms / 1000
+      )
     );
 
   const h =
-    Math.floor(total / 3600);
+    Math.floor(
+      total / 3600
+    );
 
   const m =
-    Math.floor((total % 3600) / 60);
+    Math.floor(
+      (total % 3600) / 60
+    );
 
   const s =
     total % 60;
@@ -618,7 +955,6 @@ function formatarTempo(ms) {
       String(m).padStart(2, "0"),
       String(s).padStart(2, "0")
     ].join(":");
-
   }
 
   return [
@@ -635,6 +971,7 @@ function formatarTempo(ms) {
 function render() {
 
   if (!QUESTOES.length) {
+
     $("qEnun").textContent =
       "Nenhuma questão cadastrada.";
 
@@ -648,13 +985,18 @@ function render() {
     S.cur = 0;
   }
 
-  const q = QUESTOES[S.cur];
+  const q =
+    QUESTOES[S.cur];
 
   $("qInfo").textContent =
     `Questão ${S.cur + 1} de ${QUESTOES.length}`;
 
   $("qMeta").textContent =
-    `${q.id} • ${q.tipo} • ${q.tema || "Geral"}${q.dificuldade ? " • " + q.dificuldade : ""}`;
+    `${q.id} • ${q.tipo} • ${q.tema || "Geral"}${
+      q.dificuldade
+        ? " • " + q.dificuldade
+        : ""
+    }`;
 
   $("qEnun").textContent =
     q.enunciado || "";
@@ -668,46 +1010,57 @@ function render() {
   box.innerHTML = "";
 
 
-  /* -----------------------------------------
+  /* =====================================================
      OBJETIVA
-     ----------------------------------------- */
+     ===================================================== */
 
   if (q.tipo === "objetiva") {
 
     const alternativas =
       q.alternativas || {};
 
-    Object.keys(alternativas).forEach(letra => {
+    Object.keys(alternativas)
+      .forEach(letra => {
 
-      const button =
-        document.createElement("button");
+        const button =
+          document.createElement("button");
 
-      button.type = "button";
-      button.className =
-        "alt" +
-        (
-          resposta === letra
-            ? " sel"
-            : ""
+        button.type = "button";
+
+        button.className =
+          "alt" +
+          (
+            resposta === letra
+              ? " sel"
+              : ""
+          );
+
+        button.innerHTML =
+          `<b>${esc(letra)}</b><span>${esc(alternativas[letra])}</span>`;
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            if (!S.fim) {
+              responder(
+                q.id,
+                letra
+              );
+            }
+
+          }
         );
 
-      button.innerHTML =
-        `<b>${esc(letra)}</b><span>${esc(alternativas[letra])}</span>`;
-
-      button.addEventListener(
-        "click",
-        () => responder(q.id, letra)
-      );
-
-      box.appendChild(button);
-    });
+        box.appendChild(button);
+      });
 
   }
 
 
-  /* -----------------------------------------
+  /* =====================================================
      DISCURSIVA
-     ----------------------------------------- */
+     ===================================================== */
 
   else {
 
@@ -724,20 +1077,24 @@ function render() {
       "input",
       () => {
 
-        const valor =
-          textarea.value;
+        if (S.fim) {
+          return;
+        }
 
         S.resp[q.id] =
-          valor;
+          textarea.value;
 
         salvarLocal();
-
       }
     );
 
     textarea.addEventListener(
       "blur",
       () => {
+
+        if (S.fim) {
+          return;
+        }
 
         const valor =
           textarea.value;
@@ -752,9 +1109,14 @@ function render() {
           enviar(
             "salvar_resposta",
             {
-              tentativa_id: S.tid,
-              questao_id: q.id,
-              resposta: valor
+              tentativa_id:
+                S.tid,
+
+              questao_id:
+                q.id,
+
+              resposta:
+                valor
             }
           );
         }
@@ -776,7 +1138,10 @@ function render() {
 
 function responder(id, valor) {
 
-  if (S.fim) {
+  if (
+    S.fim ||
+    !S.tid
+  ) {
     return;
   }
 
@@ -788,15 +1153,18 @@ function responder(id, valor) {
   enviar(
     "salvar_resposta",
     {
-      tentativa_id: S.tid,
-      questao_id: id,
-      resposta: valor
+      tentativa_id:
+        S.tid,
+
+      questao_id:
+        id,
+
+      resposta:
+        valor
     }
   );
 
   render();
-
-  atualizarPainel();
 }
 
 
@@ -808,6 +1176,10 @@ function atualizarPainel() {
 
   const painel =
     $("painel");
+
+  if (!painel) {
+    return;
+  }
 
   painel.innerHTML = "";
 
@@ -824,7 +1196,9 @@ function atualizarPainel() {
 
       const respondida =
         S.resp[q.id] !== undefined &&
-        String(S.resp[q.id]).trim() !== "";
+        String(
+          S.resp[q.id]
+        ).trim() !== "";
 
       if (respondida) {
         b.classList.add("done");
@@ -838,6 +1212,10 @@ function atualizarPainel() {
         "click",
         () => {
 
+          if (finalizando) {
+            return;
+          }
+
           S.cur = i;
 
           render();
@@ -849,13 +1227,30 @@ function atualizarPainel() {
   );
 
   const respondidas =
-    QUESTOES.filter(q =>
-      S.resp[q.id] !== undefined &&
-      String(S.resp[q.id]).trim() !== ""
+    QUESTOES.filter(
+      q =>
+        S.resp[q.id] !== undefined &&
+        String(
+          S.resp[q.id]
+        ).trim() !== ""
     ).length;
 
-  $("progBar").style.width =
-    `${(respondidas / Math.max(1, QUESTOES.length)) * 100}%`;
+  const barra =
+    $("progBar");
+
+  if (barra) {
+
+    barra.style.width =
+      `${
+        (
+          respondidas /
+          Math.max(
+            1,
+            QUESTOES.length
+          )
+        ) * 100
+      }%`;
+  }
 }
 
 
@@ -876,7 +1271,17 @@ function anterior() {
 
 function proxima() {
 
-  if (S.cur < QUESTOES.length - 1) {
+  if (
+    finalizando ||
+    S.fim
+  ) {
+    return;
+  }
+
+  if (
+    S.cur <
+    QUESTOES.length - 1
+  ) {
 
     S.cur++;
 
@@ -895,15 +1300,26 @@ function proxima() {
 
 function confirmarFinalizacao() {
 
+  if (
+    finalizando ||
+    S.fim
+  ) {
+    return;
+  }
+
   const faltando =
-    QUESTOES.filter(q =>
-      S.resp[q.id] === undefined ||
-      String(S.resp[q.id]).trim() === ""
+    QUESTOES.filter(
+      q =>
+        S.resp[q.id] === undefined ||
+        String(
+          S.resp[q.id]
+        ).trim() === ""
     ).length;
 
   if (faltando > 0) {
 
     abrirModal(`
+
       <h2>Atenção</h2>
 
       <p>
@@ -917,53 +1333,89 @@ function confirmarFinalizacao() {
       </p>
 
       <div class="nav">
-        <button class="btn sec" onclick="fecharModal()">
+
+        <button
+          class="btn sec"
+          onclick="fecharModal()">
           VOLTAR
         </button>
 
-        <button class="btn" onclick="fecharModal();finalizar(false)">
+        <button
+          class="btn"
+          onclick="fecharModal();finalizar(false)">
           FINALIZAR PROVA
         </button>
+
       </div>
+
     `);
 
     return;
   }
 
   abrirModal(`
+
     <h2>Finalizar prova?</h2>
 
     <p>
-      Depois de finalizada, a tentativa não poderá ser respondida
-      novamente.
+      Depois de finalizada, a tentativa não poderá
+      ser respondida novamente.
     </p>
 
     <div class="nav">
-      <button class="btn sec" onclick="fecharModal()">
+
+      <button
+        class="btn sec"
+        onclick="fecharModal()">
         CONTINUAR
       </button>
 
-      <button class="btn" onclick="fecharModal();finalizar(false)">
+      <button
+        class="btn"
+        onclick="fecharModal();finalizar(false)">
         FINALIZAR
       </button>
+
     </div>
+
   `);
 }
 
 
-async function finalizar(automatico = false) {
+async function finalizar(
+  automatico = false
+) {
 
-  if (S.fim || !S.tid) {
+  if (
+    S.fim ||
+    !S.tid ||
+    finalizando
+  ) {
     return;
   }
 
+  finalizando = true;
+
   if (timerH) {
+
     clearInterval(timerH);
+
     timerH = null;
   }
 
-  $("btnProx").disabled = true;
-  $("btnAnt").disabled = true;
+  const btnProx =
+    $("btnProx");
+
+  const btnAnt =
+    $("btnAnt");
+
+  if (btnProx) {
+    btnProx.disabled = true;
+  }
+
+  if (btnAnt) {
+    btnAnt.disabled = true;
+  }
 
   try {
 
@@ -973,17 +1425,38 @@ async function finalizar(automatico = false) {
       await api(
         "finalizar_tentativa",
         {
-          tentativa_id: S.tid,
-          respostas: S.resp,
-          fim_automatico: !!automatico,
+          tentativa_id:
+            S.tid,
+
+          respostas:
+            S.resp,
+
+          fim_automatico:
+            !!automatico,
+
           tempo_cliente:
             Math.floor(
-              (Date.now() - Number(S.inicio || Date.now())) / 1000
+              (
+                Date.now() -
+                Number(
+                  S.inicio ||
+                  Date.now()
+                )
+              ) / 1000
             )
         }
       );
 
-    if (!r || !r.resultado) {
+    /*
+     * O backend pode retornar a tentativa
+     * já finalizada se houve dupla chamada.
+     */
+
+    if (
+      !r ||
+      !r.resultado
+    ) {
+
       throw new Error(
         r?.mensagem ||
         "Não foi possível finalizar a tentativa."
@@ -991,10 +1464,13 @@ async function finalizar(automatico = false) {
     }
 
     S.fim = true;
-    S.resultado = r.resultado;
+
+    S.resultado =
+      r.resultado;
 
     if (r.respostas) {
-      S.resp = r.respostas;
+      S.resp =
+        r.respostas;
     }
 
     salvarLocal();
@@ -1003,10 +1479,18 @@ async function finalizar(automatico = false) {
 
   } catch (e) {
 
-    $("btnProx").disabled = false;
-    $("btnAnt").disabled = false;
+    finalizando = false;
+
+    if (btnProx) {
+      btnProx.disabled = false;
+    }
+
+    if (btnAnt) {
+      btnAnt.disabled = false;
+    }
 
     abrirModal(`
+
       <h2>Não foi possível finalizar</h2>
 
       <p>
@@ -1018,9 +1502,12 @@ async function finalizar(automatico = false) {
         Verifique sua conexão e tente novamente.
       </p>
 
-      <button class="btn" onclick="fecharModal()">
+      <button
+        class="btn"
+        onclick="fecharModal()">
         FECHAR
       </button>
+
     `);
   }
 }
@@ -1037,64 +1524,101 @@ function mostrarResultado() {
   document.body.classList.remove("noselect");
 
   if (timerH) {
+
     clearInterval(timerH);
+
     timerH = null;
   }
 
-  $("s-res").classList.remove("hidden");
+  const tela =
+    $("s-res");
+
+  if (!tela) {
+    return;
+  }
+
+  tela.classList.remove("hidden");
 
   const r =
     S.resultado || {};
 
   const percentual =
-    Number(r.percentual || 0);
+    Number(
+      r.percentual || 0
+    );
 
   const acertos =
-    Number(r.acertos || 0);
+    Number(
+      r.acertos || 0
+    );
 
   const erros =
-    Number(r.erros || 0);
+    Number(
+      r.erros || 0
+    );
 
   const total =
-    Number(r.total || QUESTOES.length || 0);
+    Number(
+      r.total ||
+      QUESTOES.length ||
+      0
+    );
 
   const respondidas =
     Number(
       r.respondidas ||
-      Object.values(S.resp || {})
-        .filter(v => String(v).trim() !== "")
-        .length
+      Object.values(
+        S.resp || {}
+      )
+      .filter(
+        v =>
+          String(v).trim() !== ""
+      ).length
     );
 
   const discursivas =
     QUESTOES.filter(
-      q => q.tipo === "discursiva"
+      q =>
+        q.tipo === "discursiva"
     ).length;
 
   const objetivas =
     QUESTOES.filter(
-      q => q.tipo === "objetiva"
+      q =>
+        q.tipo === "objetiva"
     ).length;
 
   const tempo =
     r.tempo_gasto != null
-      ? formatarSegundos(Number(r.tempo_gasto))
+      ? formatarSegundos(
+          Number(
+            r.tempo_gasto
+          )
+        )
       : calcularTempoGasto();
 
-
-  let mensagem =
-    msgDesempenho(percentual);
-
+  const mensagem =
+    msgDesempenho(
+      percentual
+    );
 
   let html = `
 
     <div class="card">
 
-      <p style="text-align:center;margin-bottom:4px">
+      <p
+        style="
+          text-align:center;
+          margin-bottom:4px;
+        ">
         ESTUDO DIRIGIDO
       </p>
 
-      <h1 style="text-align:center;margin-top:0">
+      <h1
+        style="
+          text-align:center;
+          margin-top:0;
+        ">
         ${esc(CONFIG.TITULO)}
       </h1>
 
@@ -1104,7 +1628,11 @@ function mostrarResultado() {
 
       <p style="text-align:center">
         Aluno:
-        <b>${esc(S.aluno?.nome || "")}</b>
+        <b>
+          ${esc(
+            S.aluno?.nome || ""
+          )}
+        </b>
       </p>
 
       <div class="big">
@@ -1122,12 +1650,16 @@ function mostrarResultado() {
 
       <h2>Seu desempenho</h2>
 
-      <div style="
-        display:grid;
-        grid-template-columns:
-          repeat(auto-fit,minmax(130px,1fr));
-        gap:10px;
-      ">
+      <div
+        style="
+          display:grid;
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(130px,1fr)
+            );
+          gap:10px;
+        ">
 
         ${cardResultado(
           "ACERTOS",
@@ -1177,9 +1709,9 @@ function mostrarResultado() {
   `;
 
 
-  /* -----------------------------------------
+  /* =====================================================
      TEMAS
-     ----------------------------------------- */
+     ===================================================== */
 
   if (
     Array.isArray(r.temas) &&
@@ -1187,25 +1719,38 @@ function mostrarResultado() {
   ) {
 
     html += `
+
       <div class="card">
-        <h2>Desempenho por tema</h2>
+
+        <h2>
+          Desempenho por tema
+        </h2>
     `;
 
     r.temas.forEach(t => {
 
       const p =
-        Number(t.percentual || 0);
+        Number(
+          t.percentual || 0
+        );
 
       html += `
+
         <div class="tema">
 
           <span>
-            ${esc(t.tema || "Geral")}
+            ${esc(
+              t.tema || "Geral"
+            )}
           </span>
 
           <b>
-            ${Number(t.acertos || 0)}/
-            ${Number(t.total || 0)}
+            ${Number(
+              t.acertos || 0
+            )}/
+            ${Number(
+              t.total || 0
+            )}
             (${p.toFixed(0)}%)
           </b>
 
@@ -1219,9 +1764,9 @@ function mostrarResultado() {
   }
 
 
-  /* -----------------------------------------
+  /* =====================================================
      REVISÃO
-     ----------------------------------------- */
+     ===================================================== */
 
   if (
     Array.isArray(r.revisao) &&
@@ -1229,129 +1774,188 @@ function mostrarResultado() {
   ) {
 
     html += `
+
       <div class="card">
 
-        <h2>Revisão das questões</h2>
+        <h2>
+          Revisão das questões
+        </h2>
     `;
 
-    r.revisao.forEach((item, index) => {
+    r.revisao.forEach(
+      (item, index) => {
 
-      const q =
-        QUESTOES.find(
-          x => x.id === item.questao_id
-        );
+        const q =
+          QUESTOES.find(
+            x =>
+              x.id ===
+              item.questao_id
+          );
 
-      const tipo =
-        q?.tipo || "";
+        const tipo =
+          q?.tipo || "";
 
-      const respostaAluno =
-        item.resposta_aluno ??
-        S.resp[item.questao_id] ??
-        "";
+        const respostaAluno =
+          item.resposta_aluno ??
+          S.resp[
+            item.questao_id
+          ] ??
+          "";
 
-      let classe = "rev";
+        let classe =
+          "rev";
 
-      if (item.correta === true) {
-        classe = "rev ok";
-      }
+        if (
+          item.correta === true
+        ) {
+          classe =
+            "rev ok";
+        }
 
-      if (item.correta === "manual") {
-        classe = "rev";
-      }
+        if (
+          item.correta === "manual"
+        ) {
+          classe =
+            "rev";
+        }
 
-      html += `
-        <div class="card ${classe}">
+        html += `
 
-          <h3>
-            Questão ${index + 1}
-          </h3>
+          <div
+            class="card ${classe}">
 
-          ${
-            q
-              ? `<p><b>${esc(q.enunciado)}</b></p>`
-              : ""
-          }
+            <h3>
+              Questão ${index + 1}
+            </h3>
 
-          <p>
-            <b>Sua resposta:</b>
-          </p>
+            ${
+              q
+                ? `
+                  <p>
+                    <b>
+                      ${esc(
+                        q.enunciado
+                      )}
+                    </b>
+                  </p>
+                `
+                : ""
+            }
 
-          <div style="
-            background:#f3f4f6;
-            padding:10px;
-            border-radius:8px;
-            white-space:pre-wrap;
-          ">
-            ${esc(
-              respostaAluno || "Não respondida"
-            )}
+            <p>
+              <b>
+                Sua resposta:
+              </b>
+            </p>
+
+            <div
+              style="
+                background:#f3f4f6;
+                padding:10px;
+                border-radius:8px;
+                white-space:pre-wrap;
+              ">
+
+              ${esc(
+                respostaAluno ||
+                "Não respondida"
+              )}
+
+            </div>
+
+            ${
+              tipo === "objetiva"
+                ? `
+                  <p>
+                    <b>
+                      Resposta correta:
+                    </b>
+                    ${esc(
+                      item.resposta_correta ||
+                      ""
+                    )}
+                  </p>
+                `
+                : `
+                  <p>
+                    <b>
+                      Correção:
+                    </b>
+                    resposta discursiva
+                    para avaliação.
+                  </p>
+                `
+            }
+
+            ${
+              item.explicacao
+                ? `
+                  <p>
+                    <b>
+                      Explicação:
+                    </b>
+                    <br>
+                    ${esc(
+                      item.explicacao
+                    )}
+                  </p>
+                `
+                : ""
+            }
+
+            ${
+              item.resposta_modelo
+                ? `
+                  <p>
+                    <b>
+                      Resposta-modelo:
+                    </b>
+                    <br>
+                    ${esc(
+                      item.resposta_modelo
+                    )}
+                  </p>
+                `
+                : ""
+            }
+
+            ${
+              item.criterios
+                ? `
+                  <p>
+                    <b>
+                      Critérios:
+                    </b>
+                    <br>
+                    ${esc(
+                      item.criterios
+                    )}
+                  </p>
+                `
+                : ""
+            }
+
+            ${
+              item.fonte
+                ? `
+                  <p>
+                    <small>
+                      <b>
+                        Fonte:
+                      </b>
+                      ${esc(
+                        item.fonte
+                      )}
+                    </small>
+                  </p>
+                `
+                : ""
+            }
+
           </div>
-
-          ${
-            tipo === "objetiva"
-              ? `
-                <p>
-                  <b>Resposta correta:</b>
-                  ${esc(item.resposta_correta || "")}
-                </p>
-              `
-              : `
-                <p>
-                  <b>Correção:</b>
-                  resposta discursiva para avaliação.
-                </p>
-              `
-          }
-
-          ${
-            item.explicacao
-              ? `
-                <p>
-                  <b>Explicação:</b><br>
-                  ${esc(item.explicacao)}
-                </p>
-              `
-              : ""
-          }
-
-          ${
-            item.resposta_modelo
-              ? `
-                <p>
-                  <b>Resposta-modelo:</b><br>
-                  ${esc(item.resposta_modelo)}
-                </p>
-              `
-              : ""
-          }
-
-          ${
-            item.criterios
-              ? `
-                <p>
-                  <b>Critérios:</b><br>
-                  ${esc(item.criterios)}
-                </p>
-              `
-              : ""
-          }
-
-          ${
-            item.fonte
-              ? `
-                <p>
-                  <small>
-                    <b>Fonte:</b>
-                    ${esc(item.fonte)}
-                  </small>
-                </p>
-              `
-              : ""
-          }
-
-        </div>
-      `;
-    });
+        `;
+      }
+    );
 
     html += `
       </div>
@@ -1359,34 +1963,41 @@ function mostrarResultado() {
   }
 
 
-  /* -----------------------------------------
-     SAIR
-     ----------------------------------------- */
+  /* =====================================================
+     SAIR / TROCAR ALUNO
+     ===================================================== */
 
   html += `
 
-    <div class="card" style="text-align:center">
+    <div
+      class="card"
+      style="text-align:center">
 
-      <h2>Seu acesso está salvo</h2>
+      <h2>
+        Seu acesso está salvo
+      </h2>
 
       <p>
-        Você pode sair agora. Quando voltar,
-        use seu e-mail e matrícula para recuperar
-        esta tentativa e consultar suas respostas.
+        Você pode sair agora.
+        Quando voltar, use seu
+        e-mail e matrícula para
+        recuperar esta tentativa
+        e consultar suas respostas.
       </p>
 
       <button
         class="btn"
         type="button"
         onclick="sairSistema()">
+
         SAIR / TROCAR ALUNO
+
       </button>
 
     </div>
   `;
 
-
-  $("s-res").innerHTML =
+  tela.innerHTML =
     html;
 }
 
@@ -1395,34 +2006,43 @@ function mostrarResultado() {
    CARDS
    ========================================================= */
 
-function cardResultado(titulo, valor, icone) {
+function cardResultado(
+  titulo,
+  valor,
+  icone
+) {
 
   return `
-    <div style="
-      border:1px solid #e5e7eb;
-      border-radius:10px;
-      padding:14px;
-      text-align:center;
-      background:#fafafa;
-    ">
 
-      <div style="font-size:1.4rem">
+    <div
+      style="
+        border:1px solid #e5e7eb;
+        border-radius:10px;
+        padding:14px;
+        text-align:center;
+        background:#fafafa;
+      ">
+
+      <div
+        style="font-size:1.4rem">
         ${icone}
       </div>
 
-      <div style="
-        font-size:.78rem;
-        color:#6b7280;
-        font-weight:700;
-      ">
+      <div
+        style="
+          font-size:.78rem;
+          color:#6b7280;
+          font-weight:700;
+        ">
         ${titulo}
       </div>
 
-      <div style="
-        font-size:1.25rem;
-        font-weight:800;
-        margin-top:3px;
-      ">
+      <div
+        style="
+          font-size:1.25rem;
+          font-weight:800;
+          margin-top:3px;
+        ">
         ${esc(valor)}
       </div>
 
@@ -1438,18 +2058,33 @@ function cardResultado(titulo, valor, icone) {
 function msgDesempenho(p) {
 
   if (p >= 90) {
-    return "Excelente desempenho. Continue aprofundando os conteúdos.";
+
+    return (
+      "Excelente desempenho. " +
+      "Continue aprofundando os conteúdos."
+    );
   }
 
   if (p >= 70) {
-    return "Bom desempenho. Revise os pontos que ficaram abaixo do esperado.";
+
+    return (
+      "Bom desempenho. " +
+      "Revise os pontos que ficaram abaixo do esperado."
+    );
   }
 
   if (p >= 50) {
-    return "Você já possui uma base. A revisão dos temas pode fortalecer seu desempenho.";
+
+    return (
+      "Você já possui uma base. " +
+      "A revisão dos temas pode fortalecer seu desempenho."
+    );
   }
 
-  return "Use esta revisão para identificar os conteúdos que precisam de mais estudo.";
+  return (
+    "Use esta revisão para identificar " +
+    "os conteúdos que precisam de mais estudo."
+  );
 }
 
 
@@ -1467,11 +2102,16 @@ function calcularTempoGasto() {
     Math.max(
       0,
       Math.floor(
-        (Date.now() - Number(S.inicio)) / 1000
+        (
+          Date.now() -
+          Number(S.inicio)
+        ) / 1000
       )
     );
 
-  return formatarSegundos(segundos);
+  return formatarSegundos(
+    segundos
+  );
 }
 
 
@@ -1484,20 +2124,34 @@ function formatarSegundos(seg) {
     );
 
   const h =
-    Math.floor(seg / 3600);
+    Math.floor(
+      seg / 3600
+    );
 
   const m =
-    Math.floor((seg % 3600) / 60);
+    Math.floor(
+      (seg % 3600) / 60
+    );
 
   const s =
     seg % 60;
 
   if (h > 0) {
 
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return (
+      String(h).padStart(2, "0") +
+      ":" +
+      String(m).padStart(2, "0") +
+      ":" +
+      String(s).padStart(2, "0")
+    );
   }
 
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return (
+    String(m).padStart(2, "0") +
+    ":" +
+    String(s).padStart(2, "0")
+  );
 }
 
 
@@ -1507,18 +2161,42 @@ function formatarSegundos(seg) {
 
 function abrirModal(html) {
 
-  $("modalBox").innerHTML =
+  const box =
+    $("modalBox");
+
+  const modal =
+    $("modal");
+
+  if (!box || !modal) {
+    return;
+  }
+
+  box.innerHTML =
     html;
 
-  $("modal").classList.remove("hidden");
+  modal.classList.remove(
+    "hidden"
+  );
 }
 
 
 function fecharModal() {
 
-  $("modal").classList.add("hidden");
+  const modal =
+    $("modal");
 
-  $("modalBox").innerHTML = "";
+  const box =
+    $("modalBox");
+
+  if (modal) {
+    modal.classList.add(
+      "hidden"
+    );
+  }
+
+  if (box) {
+    box.innerHTML = "";
+  }
 }
 
 
@@ -1529,15 +2207,32 @@ function fecharModal() {
 function sairSistema() {
 
   if (timerH) {
+
     clearInterval(timerH);
+
     timerH = null;
   }
 
   saiu = true;
+  finalizando = false;
 
-  document.body.classList.remove("noselect");
+  document.body.classList.remove(
+    "noselect"
+  );
+
+  /*
+   * IMPORTANTE:
+   * não cancelamos a tentativa no backend.
+   *
+   * Apenas limpamos o acesso local.
+   *
+   * Assim o aluno pode voltar depois
+   * usando e-mail + matrícula.
+   */
 
   limparLocal();
+
+  fecharModal();
 
   mostrarIdentificacao();
 }
@@ -1557,6 +2252,7 @@ function mensagemErro(e) {
     );
 
   const mapa = {
+
     "prova_nao_encontrada":
       "A prova não foi encontrada no sistema.",
 
@@ -1596,95 +2292,133 @@ function mensagemErro(e) {
    EVENTOS DE BOTÕES
    ========================================================= */
 
-$("btnContinuar").addEventListener(
-  "click",
-  continuarIdentificacao
-);
+function configurarEventos() {
 
-$("btnEntrar").addEventListener(
-  "click",
-  entrarAluno
-);
+  $("btnContinuar")?.addEventListener(
+    "click",
+    continuarIdentificacao
+  );
 
-$("btnIniciar").addEventListener(
-  "click",
-  iniciarNovaTentativa
-);
+  $("btnEntrar")?.addEventListener(
+    "click",
+    entrarAluno
+  );
 
-$("aceite").addEventListener(
-  "change",
-  () => {
+  $("btnIniciar")?.addEventListener(
+    "click",
+    iniciarNovaTentativa
+  );
 
-    $("btnIniciar").disabled =
-      !$("aceite").checked;
-  }
-);
+  $("aceite")?.addEventListener(
+    "change",
+    () => {
 
-$("btnAnt").addEventListener(
-  "click",
-  anterior
-);
-
-$("btnProx").addEventListener(
-  "click",
-  proxima
-);
-
-$("btnSairProva").addEventListener(
-  "click",
-  () => {
-
-    abrirModal(`
-      <h2>Sair da prova?</h2>
-
-      <p>
-        Suas respostas já salvas permanecerão registradas.
-        Você poderá voltar depois usando seu e-mail e matrícula.
-      </p>
-
-      <div class="nav">
-
-        <button
-          class="btn sec"
-          onclick="fecharModal()">
-          CONTINUAR
-        </button>
-
-        <button
-          class="btn"
-          onclick="fecharModal();sairSistema()">
-          SAIR
-        </button>
-
-      </div>
-    `);
-  }
-);
-
-
-/* =========================================================
-   TECLAS ENTER
-   ========================================================= */
-
-$("loginMatricula").addEventListener(
-  "keydown",
-  e => {
-
-    if (e.key === "Enter") {
-      entrarAluno();
+      $("btnIniciar").disabled =
+        !$("aceite").checked;
     }
-  }
-);
+  );
 
-$("matricula").addEventListener(
-  "keydown",
-  e => {
+  $("btnAnt")?.addEventListener(
+    "click",
+    anterior
+  );
 
-    if (e.key === "Enter") {
-      continuarIdentificacao();
+  $("btnProx")?.addEventListener(
+    "click",
+    proxima
+  );
+
+  $("btnSairProva")?.addEventListener(
+    "click",
+    () => {
+
+      abrirModal(`
+
+        <h2>Sair da prova?</h2>
+
+        <p>
+          Suas respostas já salvas permanecerão
+          registradas. Você poderá voltar depois
+          usando seu e-mail e matrícula.
+        </p>
+
+        <div class="nav">
+
+          <button
+            class="btn sec"
+            onclick="fecharModal()">
+
+            CONTINUAR
+
+          </button>
+
+          <button
+            class="btn"
+            onclick="fecharModal();sairSistema()">
+
+            SAIR
+
+          </button>
+
+        </div>
+
+      `);
     }
-  }
-);
+  );
+
+
+  /* =====================================================
+     TECLAS ENTER
+     ===================================================== */
+
+  $("loginMatricula")?.addEventListener(
+    "keydown",
+    e => {
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        entrarAluno();
+      }
+
+    }
+  );
+
+  $("loginEmail")?.addEventListener(
+    "keydown",
+    e => {
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        entrarAluno();
+      }
+
+    }
+  );
+
+  $("matricula")?.addEventListener(
+    "keydown",
+    e => {
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        continuarIdentificacao();
+      }
+
+    }
+  );
+
+  $("email")?.addEventListener(
+    "keydown",
+    e => {
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        continuarIdentificacao();
+      }
+
+    }
+  );
+}
 
 
 /* =========================================================
@@ -1696,76 +2430,113 @@ document.addEventListener(
   e => {
 
     if (
-      document.body.classList.contains("noselect") &&
-      !e.target.matches("textarea,input")
+      document.body.classList.contains(
+        "noselect"
+      ) &&
+      !e.target.matches(
+        "textarea,input"
+      )
     ) {
 
       e.preventDefault();
 
-      evento("copy", {});
+      evento(
+        "copy",
+        {}
+      );
     }
   }
 );
+
 
 document.addEventListener(
   "cut",
   e => {
 
     if (
-      document.body.classList.contains("noselect") &&
-      !e.target.matches("textarea,input")
+      document.body.classList.contains(
+        "noselect"
+      ) &&
+      !e.target.matches(
+        "textarea,input"
+      )
     ) {
 
       e.preventDefault();
 
-      evento("cut", {});
+      evento(
+        "cut",
+        {}
+      );
     }
   }
 );
+
 
 document.addEventListener(
   "paste",
   e => {
 
     if (
-      document.body.classList.contains("noselect") &&
-      !e.target.matches("textarea,input")
+      document.body.classList.contains(
+        "noselect"
+      ) &&
+      !e.target.matches(
+        "textarea,input"
+      )
     ) {
 
       e.preventDefault();
 
-      evento("paste", {});
+      evento(
+        "paste",
+        {}
+      );
     }
   }
 );
+
 
 document.addEventListener(
   "contextmenu",
   e => {
 
     if (
-      document.body.classList.contains("noselect") &&
-      !e.target.matches("textarea,input")
+      document.body.classList.contains(
+        "noselect"
+      ) &&
+      !e.target.matches(
+        "textarea,input"
+      )
     ) {
 
       e.preventDefault();
 
-      evento("contextmenu", {});
+      evento(
+        "contextmenu",
+        {}
+      );
     }
   }
 );
+
 
 document.addEventListener(
   "dragstart",
   e => {
 
     if (
-      document.body.classList.contains("noselect")
+      document.body.classList.contains(
+        "noselect"
+      )
     ) {
 
       e.preventDefault();
 
-      evento("dragstart", {});
+      evento(
+        "dragstart",
+        {}
+      );
     }
   }
 );
@@ -1788,7 +2559,8 @@ document.addEventListener(
       evento(
         "saida_aba",
         {
-          motivo: "visibilitychange"
+          motivo:
+            "visibilitychange"
         }
       );
     }
@@ -1827,24 +2599,27 @@ window.addEventListener(
 
 async function init() {
 
-  $("hTitulo").textContent =
-    CONFIG.TITULO || "";
+  if ($("hTitulo")) {
 
-  $("hSub").textContent =
-    CONFIG.SUBTITULO
-      ? " — " + CONFIG.SUBTITULO
-      : "";
+    $("hTitulo").textContent =
+      CONFIG.TITULO || "";
+  }
+
+  if ($("hSub")) {
+
+    $("hSub").textContent =
+      CONFIG.SUBTITULO
+        ? " — " +
+          CONFIG.SUBTITULO
+        : "";
+  }
 
   carregarLocal();
 
 
   /*
-   * Se houver uma tentativa em andamento salva
-   * localmente, mantemos a possibilidade de retomada.
-   *
-   * Se já estiver finalizada, NÃO mostramos automaticamente
-   * o resultado. O usuário deverá entrar novamente com
-   * e-mail + matrícula.
+   * Se existe tentativa em andamento
+   * salva localmente, verificamos no backend.
    */
 
   if (
@@ -1858,14 +2633,27 @@ async function init() {
         await api(
           "verificar_tentativa",
           {
-            tentativa_id: S.tid
+            tentativa_id:
+              S.tid
           }
         );
+
+
+      /* -----------------------------------------
+         BACKEND DIZ QUE JÁ FINALIZOU
+         ----------------------------------------- */
 
       if (
         r &&
         r.status === "finalizada"
       ) {
+
+        /*
+         * Não mostramos automaticamente.
+         *
+         * O usuário precisa fazer login
+         * novamente para acessar o resultado.
+         */
 
         limparLocal();
 
@@ -1874,24 +2662,36 @@ async function init() {
         return;
       }
 
+
+      /* -----------------------------------------
+         TENTATIVA AINDA EM ANDAMENTO
+         ----------------------------------------- */
+
       if (
         r &&
         r.status === "em_andamento"
       ) {
 
         if (r.respostas) {
+
           S.resp =
             r.respostas;
         }
 
         if (r.inicio_ts) {
+
           S.inicio =
-            Number(r.inicio_ts);
+            Number(
+              r.inicio_ts
+            );
         }
 
         if (r.tempo_limite) {
+
           S.limite =
-            Number(r.tempo_limite);
+            Number(
+              r.tempo_limite
+            );
         }
 
         S.fim = false;
@@ -1903,10 +2703,23 @@ async function init() {
         return;
       }
 
+
+      /*
+       * Se o backend não reconheceu
+       * a tentativa, limpamos o acesso.
+       */
+
+      limparLocal();
+
+      mostrarIdentificacao();
+
+      return;
+
     } catch (e) {
 
       /*
-       * Se estiver sem internet, usamos o estado local.
+       * Sem internet:
+       * usamos o estado local.
        */
 
       iniciarProva();
@@ -1918,11 +2731,17 @@ async function init() {
 
   /*
    * Resultado finalizado salvo localmente:
-   * limpar para impedir que outro usuário do mesmo
-   * computador veja o resultado sem fazer login.
+   *
+   * NÃO mostrar automaticamente.
+   *
+   * Isso impede que outro usuário no mesmo
+   * computador veja o resultado sem login.
    */
 
-  if (S.tid && S.fim) {
+  if (
+    S.tid &&
+    S.fim
+  ) {
 
     limparLocal();
   }
@@ -1930,5 +2749,11 @@ async function init() {
   mostrarIdentificacao();
 }
 
+
+/* =========================================================
+   INICIAR APLICAÇÃO
+   ========================================================= */
+
+configurarEventos();
 
 init();
