@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estudo Dirigido Dentística — Prova 01</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div><b id="hTitulo"></b> <span id="hSub"></span></div>
+  <div id="barra" class="hidden"><span id="qInfo"></span><span id="timer">⏱ 00:00</span></div>
+</header>
+<main>
+  <div id="aviso" class="card warn hidden"></div>
+
+  <!-- 1. Identificação -->
+  <section id="s-id" class="card">
+    <h2>Identificação</h2>
+    <label>Nome completo<input id="nome" autocomplete="name"></label>
+    <label>E-mail<input id="email" type="email" autocomplete="email"></label>
+    <label>Matrícula<input id="matricula"></label>
+    <p id="erroId" class="erro"></p>
+    <button class="btn" id="btnContinuar">CONTINUAR</button>
+  </section>
+
+  <!-- 2. Termos -->
+  <section id="s-termos" class="card hidden">
+    <h2>Termos de participação</h2>
+    <p>O aluno declara estar ciente de que as questões apresentadas neste estudo dirigido abrangem diferentes conteúdos relacionados à disciplina e podem apresentar abordagem, profundidade ou cobrança diferente daquela utilizada na avaliação oficial da disciplina ou pelo professor responsável. A realização deste estudo dirigido não garante que os mesmos conteúdos ou questões estarão presentes em avaliações futuras.</p>
+    <p><small>Os dados informados serão utilizados para identificação da tentativa, registro de desempenho e acompanhamento acadêmico relacionado a este estudo dirigido.</small></p>
+    <label class="chk"><input type="checkbox" id="aceite"> Li e aceito os termos.</label>
+    <p id="erroTermos" class="erro"></p>
+    <button class="btn" id="btnIniciar" disabled>ACEITAR E INICIAR PROVA</button>
+  </section>
+
+  <!-- 3. Prova -->
+  <section id="s-prova" class="hidden">
+    <div id="progresso"><div id="progBar"></div></div>
+    <div class="card">
+      <div id="qMeta" class="meta"></div>
+      <div id="qEnun" class="enun"></div>
+      <div id="qResp"></div>
+    </div>
+    <div class="nav">
+      <button class="btn sec" id="btnAnt">← ANTERIOR</button>
+      <button class="btn" id="btnProx">PRÓXIMA →</button>
+    </div>
+    <div class="card"><b>Questões</b><div id="painel" class="painel"></div>
+      <small>🟦 atual · 🟩 respondida · ⬜ em branco</small></div>
+  </section>
+
+  <!-- 4. Resultado -->
+  <section id="s-res" class="hidden"></section>
+</main>
+
+<div id="modal" class="modal hidden"><div class="card" id="modalBox"></div></div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="config.js"></script>
+<script src="questoes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
