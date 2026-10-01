@@ -41,7 +41,6 @@ function salvarLocal() {
 
 function carregarLocal() {
   try {
-
     const j = localStorage.getItem(KEY);
 
     if (j) {
@@ -409,13 +408,6 @@ async function continuarIdentificacao() {
         "Esta prova não está disponível."
       );
     }
-
-    /*
-     * Importante:
-     * começamos uma NOVA sessão local.
-     * Isso impede que dados de outro aluno
-     * sejam misturados.
-     */
 
     limparLocal();
 
@@ -1447,11 +1439,6 @@ async function finalizar(
         }
       );
 
-    /*
-     * O backend pode retornar a tentativa
-     * já finalizada se houve dupla chamada.
-     */
-
     if (
       !r ||
       !r.resultado
@@ -1514,6 +1501,240 @@ async function finalizar(
 
 
 /* =========================================================
+   UTILITÁRIOS DO RESULTADO
+   ========================================================= */
+
+function obterAlternativaTexto(q, valor) {
+
+  if (!q || !valor) {
+    return valor || "";
+  }
+
+  if (
+    q.alternativas &&
+    Object.prototype.hasOwnProperty.call(
+      q.alternativas,
+      valor
+    )
+  ) {
+    return q.alternativas[valor];
+  }
+
+  return valor;
+}
+
+
+function obterRespostaCorretaTexto(q, valor) {
+
+  if (!q || !valor) {
+    return valor || "";
+  }
+
+  return obterAlternativaTexto(
+    q,
+    valor
+  );
+}
+
+
+function classeResultadoItem(item) {
+
+  if (item.correta === true) {
+    return "correct";
+  }
+
+  if (item.correta === false) {
+    return "wrong";
+  }
+
+  if (item.correta === "manual") {
+    return "manual";
+  }
+
+  return "neutral";
+}
+
+
+/* =========================================================
+   GRÁFICO CIRCULAR
+   ========================================================= */
+
+function graficoCircular(percentual) {
+
+  const p =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(percentual || 0)
+      )
+    );
+
+  const raio = 74;
+  const circ =
+    2 * Math.PI * raio;
+
+  const offset =
+    circ -
+    (p / 100) * circ;
+
+  return `
+
+    <div class="score-chart">
+
+      <svg
+        viewBox="0 0 180 180"
+        class="score-svg"
+        aria-label="Desempenho de ${p.toFixed(0)} por cento">
+
+        <circle
+          cx="90"
+          cy="90"
+          r="${raio}"
+          class="score-track">
+        </circle>
+
+        <circle
+          cx="90"
+          cy="90"
+          r="${raio}"
+          class="score-progress"
+          stroke-dasharray="${circ}"
+          stroke-dashoffset="${offset}">
+        </circle>
+
+      </svg>
+
+      <div class="score-center">
+
+        <strong>
+          ${p.toFixed(0)}%
+        </strong>
+
+        <span>
+          desempenho
+        </span>
+
+      </div>
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   GRÁFICO DE BARRAS POR TEMA
+   ========================================================= */
+
+function graficoTemas(temas) {
+
+  if (
+    !Array.isArray(temas) ||
+    !temas.length
+  ) {
+    return `
+      <div class="empty-chart">
+        Ainda não há dados suficientes
+        para montar o gráfico por tema.
+      </div>
+    `;
+  }
+
+  return `
+
+    <div class="tema-chart">
+
+      ${temas.map(t => {
+
+        const percentual =
+          Math.max(
+            0,
+            Math.min(
+              100,
+              Number(
+                t.percentual || 0
+              )
+            )
+          );
+
+        const nome =
+          t.tema ||
+          "Geral";
+
+        const acertos =
+          Number(
+            t.acertos || 0
+          );
+
+        const total =
+          Number(
+            t.total || 0
+          );
+
+        return `
+
+          <div class="tema-row">
+
+            <div class="tema-row-head">
+
+              <span>
+                ${esc(nome)}
+              </span>
+
+              <strong>
+                ${acertos}/${total}
+                · ${percentual.toFixed(0)}%
+              </strong>
+
+            </div>
+
+            <div class="tema-track">
+
+              <div
+                class="tema-fill"
+                style="width:${percentual}%">
+              </div>
+
+            </div>
+
+          </div>
+        `;
+
+      }).join("")}
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   CARDS DE RESULTADO
+   ========================================================= */
+
+function cardResultado(
+  titulo,
+  valor,
+  classe = ""
+) {
+
+  return `
+
+    <div class="result-stat ${classe}">
+
+      <span class="result-stat-label">
+        ${esc(titulo)}
+      </span>
+
+      <strong class="result-stat-value">
+        ${esc(valor)}
+      </strong>
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
    RESULTADO
    ========================================================= */
 
@@ -1566,11 +1787,10 @@ function mostrarResultado() {
 
   const respondidas =
     Number(
-      r.respondidas ||
+      r.respondidas ??
       Object.values(
         S.resp || {}
-      )
-      .filter(
+      ).filter(
         v =>
           String(v).trim() !== ""
       ).length
@@ -1602,163 +1822,174 @@ function mostrarResultado() {
       percentual
     );
 
+  const revisao =
+    Array.isArray(r.revisao)
+      ? r.revisao
+      : [];
+
+  const temas =
+    Array.isArray(r.temas)
+      ? r.temas
+      : [];
+
+
+  /* =====================================================
+     CABEÇALHO / HERO
+     ===================================================== */
+
   let html = `
 
-    <div class="card">
+    <div class="result-hero">
 
-      <p
-        style="
-          text-align:center;
-          margin-bottom:4px;
-        ">
-        ESTUDO DIRIGIDO
-      </p>
+      <div class="result-hero-content">
 
-      <h1
-        style="
-          text-align:center;
-          margin-top:0;
-        ">
-        ${esc(CONFIG.TITULO)}
-      </h1>
+        <div class="result-kicker">
+          RESULTADO DA AVALIAÇÃO
+        </div>
 
-      <p style="text-align:center">
-        ${esc(CONFIG.SUBTITULO)}
-      </p>
+        <h1>
+          ${esc(CONFIG.TITULO)}
+        </h1>
 
-      <p style="text-align:center">
-        Aluno:
-        <b>
-          ${esc(
-            S.aluno?.nome || ""
-          )}
-        </b>
-      </p>
+        <p class="result-subtitle">
+          ${esc(CONFIG.SUBTITULO)}
+        </p>
 
-      <div class="big">
-        ${percentual.toFixed(0)}%
+        <div class="result-student">
+          <span>Aluno</span>
+          <strong>
+            ${esc(
+              S.aluno?.nome || ""
+            )}
+          </strong>
+        </div>
+
       </div>
 
-      <p style="text-align:center">
-        ${esc(mensagem)}
-      </p>
+      ${graficoCircular(percentual)}
 
     </div>
 
 
-    <div class="card">
+    <div class="result-message">
 
-      <h2>Seu desempenho</h2>
+      <span class="result-message-icon">
+        ✦
+      </span>
 
-      <div
-        style="
-          display:grid;
-          grid-template-columns:
-            repeat(
-              auto-fit,
-              minmax(130px,1fr)
-            );
-          gap:10px;
-        ">
+      <div>
 
-        ${cardResultado(
-          "ACERTOS",
-          acertos,
-          "🟢"
-        )}
+        <strong>
+          Análise do seu desempenho
+        </strong>
 
-        ${cardResultado(
-          "ERROS",
-          erros,
-          "🔴"
-        )}
-
-        ${cardResultado(
-          "RESPONDIDAS",
-          respondidas,
-          "🟦"
-        )}
-
-        ${cardResultado(
-          "TOTAL",
-          total,
-          "📚"
-        )}
-
-        ${cardResultado(
-          "OBJETIVAS",
-          objetivas,
-          "🎯"
-        )}
-
-        ${cardResultado(
-          "DISCURSIVAS",
-          discursivas,
-          "✍️"
-        )}
-
-        ${cardResultado(
-          "TEMPO",
-          tempo,
-          "⏱️"
-        )}
+        <p>
+          ${esc(mensagem)}
+        </p>
 
       </div>
+
+    </div>
+
+
+    <div class="result-section-title">
+
+      <span>
+        VISÃO GERAL
+      </span>
+
+      <h2>
+        Seu desempenho
+      </h2>
+
+    </div>
+
+
+    <div class="result-grid">
+
+      ${cardResultado(
+        "Acertos",
+        acertos,
+        "stat-success"
+      )}
+
+      ${cardResultado(
+        "Erros",
+        erros,
+        "stat-danger"
+      )}
+
+      ${cardResultado(
+        "Respondidas",
+        respondidas,
+        "stat-info"
+      )}
+
+      ${cardResultado(
+        "Total",
+        total,
+        "stat-neutral"
+      )}
+
+      ${cardResultado(
+        "Objetivas",
+        objetivas,
+        "stat-neutral"
+      )}
+
+      ${cardResultado(
+        "Discursivas",
+        discursivas,
+        "stat-neutral"
+      )}
+
+      ${cardResultado(
+        "Tempo",
+        tempo,
+        "stat-neutral"
+      )}
 
     </div>
   `;
 
 
   /* =====================================================
-     TEMAS
+     GRÁFICO POR TEMA
      ===================================================== */
 
-  if (
-    Array.isArray(r.temas) &&
-    r.temas.length
-  ) {
+  if (temas.length) {
 
     html += `
 
-      <div class="card">
+      <div class="result-panel">
 
-        <h2>
-          Desempenho por tema
-        </h2>
-    `;
+        <div class="panel-heading">
 
-    r.temas.forEach(t => {
+          <div>
 
-      const p =
-        Number(
-          t.percentual || 0
-        );
+            <span class="panel-kicker">
+              ANÁLISE
+            </span>
 
-      html += `
+            <h2>
+              Desempenho por tema
+            </h2>
 
-        <div class="tema">
+          </div>
 
-          <span>
-            ${esc(
-              t.tema || "Geral"
-            )}
+          <span class="panel-badge">
+            ${temas.length}
+            ${
+              temas.length === 1
+                ? "tema"
+                : "temas"
+            }
           </span>
 
-          <b>
-            ${Number(
-              t.acertos || 0
-            )}/
-            ${Number(
-              t.total || 0
-            )}
-            (${p.toFixed(0)}%)
-          </b>
-
         </div>
-      `;
-    });
 
-    html += `
+        ${graficoTemas(temas)}
+
       </div>
     `;
   }
@@ -1768,21 +1999,40 @@ function mostrarResultado() {
      REVISÃO
      ===================================================== */
 
-  if (
-    Array.isArray(r.revisao) &&
-    r.revisao.length
-  ) {
+  if (revisao.length) {
 
     html += `
 
-      <div class="card">
+      <div class="result-panel review-panel">
 
-        <h2>
-          Revisão das questões
-        </h2>
+        <div class="panel-heading">
+
+          <div>
+
+            <span class="panel-kicker">
+              REVISÃO
+            </span>
+
+            <h2>
+              Questões e respostas
+            </h2>
+
+          </div>
+
+          <span class="panel-badge">
+            ${revisao.length}
+            ${
+              revisao.length === 1
+                ? "questão"
+                : "questões"
+            }
+          </span>
+
+        </div>
+
     `;
 
-    r.revisao.forEach(
+    revisao.forEach(
       (item, index) => {
 
         const q =
@@ -1802,157 +2052,282 @@ function mostrarResultado() {
           ] ??
           "";
 
-        let classe =
-          "rev";
+        const respostaAlunoTexto =
+          tipo === "objetiva"
+            ? obterAlternativaTexto(
+                q,
+                respostaAluno
+              )
+            : respostaAluno;
 
-        if (
-          item.correta === true
-        ) {
-          classe =
-            "rev ok";
+        const correta =
+          item.correta;
+
+        const classe =
+          classeResultadoItem(
+            item
+          );
+
+        let respostaCorreta =
+          item.resposta_correta || "";
+
+        if (tipo === "objetiva") {
+
+          respostaCorreta =
+            obterRespostaCorretaTexto(
+              q,
+              respostaCorreta
+            );
         }
 
-        if (
-          item.correta === "manual"
-        ) {
-          classe =
-            "rev";
+        let statusTexto =
+          "Avaliação";
+
+        if (correta === true) {
+          statusTexto = "Resposta correta";
+        }
+
+        if (correta === false) {
+          statusTexto = "Resposta incorreta";
+        }
+
+        if (correta === "manual") {
+          statusTexto = "Correção manual";
         }
 
         html += `
 
-          <div
-            class="card ${classe}">
+          <article
+            class="review-item ${classe}">
 
-            <h3>
-              Questão ${index + 1}
-            </h3>
+            <div class="review-head">
+
+              <div class="review-number">
+                ${String(
+                  index + 1
+                ).padStart(2, "0")}
+              </div>
+
+              <div class="review-title">
+
+                <span>
+                  ${esc(
+                    q?.tema ||
+                    "Questão"
+                  )}
+                </span>
+
+                <h3>
+                  Questão ${index + 1}
+                </h3>
+
+              </div>
+
+              <div class="review-status">
+                ${esc(statusTexto)}
+              </div>
+
+            </div>
+
 
             ${
               q
                 ? `
-                  <p>
-                    <b>
-                      ${esc(
-                        q.enunciado
-                      )}
-                    </b>
-                  </p>
+                  <div class="review-enunciado">
+
+                    ${esc(
+                      q.enunciado ||
+                      ""
+                    )}
+
+                  </div>
                 `
                 : ""
             }
 
-            <p>
-              <b>
-                Sua resposta:
-              </b>
-            </p>
 
-            <div
-              style="
-                background:#f3f4f6;
-                padding:10px;
-                border-radius:8px;
-                white-space:pre-wrap;
-              ">
+            <div class="answer-grid">
 
-              ${esc(
-                respostaAluno ||
-                "Não respondida"
-              )}
+              <div class="answer-box student-answer">
+
+                <span class="answer-label">
+                  SUA RESPOSTA
+                </span>
+
+                <strong>
+                  ${
+                    respostaAlunoTexto
+                      ? esc(
+                          respostaAlunoTexto
+                        )
+                      : "Não respondida"
+                  }
+                </strong>
+
+                ${
+                  tipo === "objetiva" &&
+                  respostaAluno
+                    ? `
+                      <small>
+                        Alternativa
+                        ${esc(
+                          respostaAluno
+                        )}
+                      </small>
+                    `
+                    : ""
+                }
+
+              </div>
+
+
+              ${
+                tipo === "objetiva"
+                  ? `
+
+                    <div class="answer-box correct-answer">
+
+                      <span class="answer-label">
+                        RESPOSTA CORRETA
+                      </span>
+
+                      <strong>
+                        ${
+                          respostaCorreta
+                            ? esc(
+                                respostaCorreta
+                              )
+                            : "Não informada"
+                        }
+                      </strong>
+
+                      ${
+                        item.resposta_correta
+                          ? `
+                            <small>
+                              Alternativa
+                              ${esc(
+                                item.resposta_correta
+                              )}
+                            </small>
+                          `
+                          : ""
+                      }
+
+                    </div>
+
+                  `
+                  : `
+                    <div class="answer-box manual-answer">
+
+                      <span class="answer-label">
+                        CORREÇÃO
+                      </span>
+
+                      <strong>
+                        Avaliação discursiva
+                      </strong>
+
+                      <small>
+                        Esta resposta pode exigir
+                        correção manual.
+                      </small>
+
+                    </div>
+                  `
+              }
 
             </div>
 
-            ${
-              tipo === "objetiva"
-                ? `
-                  <p>
-                    <b>
-                      Resposta correta:
-                    </b>
-                    ${esc(
-                      item.resposta_correta ||
-                      ""
-                    )}
-                  </p>
-                `
-                : `
-                  <p>
-                    <b>
-                      Correção:
-                    </b>
-                    resposta discursiva
-                    para avaliação.
-                  </p>
-                `
-            }
 
             ${
               item.explicacao
                 ? `
-                  <p>
-                    <b>
-                      Explicação:
-                    </b>
-                    <br>
-                    ${esc(
-                      item.explicacao
-                    )}
-                  </p>
+
+                  <div class="review-detail">
+
+                    <span>
+                      EXPLICAÇÃO
+                    </span>
+
+                    <p>
+                      ${esc(
+                        item.explicacao
+                      )}
+                    </p>
+
+                  </div>
+
                 `
                 : ""
             }
+
 
             ${
               item.resposta_modelo
                 ? `
-                  <p>
-                    <b>
-                      Resposta-modelo:
-                    </b>
-                    <br>
-                    ${esc(
-                      item.resposta_modelo
-                    )}
-                  </p>
+
+                  <div class="review-detail">
+
+                    <span>
+                      RESPOSTA-MODELO
+                    </span>
+
+                    <p>
+                      ${esc(
+                        item.resposta_modelo
+                      )}
+                    </p>
+
+                  </div>
+
                 `
                 : ""
             }
+
 
             ${
               item.criterios
                 ? `
-                  <p>
-                    <b>
-                      Critérios:
-                    </b>
-                    <br>
-                    ${esc(
-                      item.criterios
-                    )}
-                  </p>
+
+                  <div class="review-detail">
+
+                    <span>
+                      CRITÉRIOS
+                    </span>
+
+                    <p>
+                      ${esc(
+                        item.criterios
+                      )}
+                    </p>
+
+                  </div>
+
                 `
                 : ""
             }
+
 
             ${
               item.fonte
                 ? `
-                  <p>
-                    <small>
-                      <b>
-                        Fonte:
-                      </b>
-                      ${esc(
-                        item.fonte
-                      )}
-                    </small>
-                  </p>
+
+                  <div class="review-source">
+
+                    Fonte:
+                    ${esc(
+                      item.fonte
+                    )}
+
+                  </div>
+
                 `
                 : ""
             }
 
-          </div>
+          </article>
+
         `;
       }
     );
@@ -1964,29 +2339,32 @@ function mostrarResultado() {
 
 
   /* =====================================================
-     SAIR / TROCAR ALUNO
+     RODAPÉ
      ===================================================== */
 
   html += `
 
-    <div
-      class="card"
-      style="text-align:center">
+    <div class="result-footer">
 
-      <h2>
-        Seu acesso está salvo
-      </h2>
+      <div>
 
-      <p>
-        Você pode sair agora.
-        Quando voltar, use seu
-        e-mail e matrícula para
-        recuperar esta tentativa
-        e consultar suas respostas.
-      </p>
+        <span>
+          ACESSO SEGURO
+        </span>
+
+        <strong>
+          Seu resultado está salvo
+        </strong>
+
+        <p>
+          Você poderá consultar novamente
+          utilizando seu e-mail e matrícula.
+        </p>
+
+      </div>
 
       <button
-        class="btn"
+        class="btn result-exit"
         type="button"
         onclick="sairSistema()">
 
@@ -1995,59 +2373,11 @@ function mostrarResultado() {
       </button>
 
     </div>
+
   `;
 
   tela.innerHTML =
     html;
-}
-
-
-/* =========================================================
-   CARDS
-   ========================================================= */
-
-function cardResultado(
-  titulo,
-  valor,
-  icone
-) {
-
-  return `
-
-    <div
-      style="
-        border:1px solid #e5e7eb;
-        border-radius:10px;
-        padding:14px;
-        text-align:center;
-        background:#fafafa;
-      ">
-
-      <div
-        style="font-size:1.4rem">
-        ${icone}
-      </div>
-
-      <div
-        style="
-          font-size:.78rem;
-          color:#6b7280;
-          font-weight:700;
-        ">
-        ${titulo}
-      </div>
-
-      <div
-        style="
-          font-size:1.25rem;
-          font-weight:800;
-          margin-top:3px;
-        ">
-        ${esc(valor)}
-      </div>
-
-    </div>
-  `;
 }
 
 
@@ -2219,16 +2549,6 @@ function sairSistema() {
   document.body.classList.remove(
     "noselect"
   );
-
-  /*
-   * IMPORTANTE:
-   * não cancelamos a tentativa no backend.
-   *
-   * Apenas limpamos o acesso local.
-   *
-   * Assim o aluno pode voltar depois
-   * usando e-mail + matrícula.
-   */
 
   limparLocal();
 
@@ -2617,10 +2937,9 @@ async function init() {
   carregarLocal();
 
 
-  /*
-   * Se existe tentativa em andamento
-   * salva localmente, verificamos no backend.
-   */
+  /* =====================================================
+     TENTATIVA EM ANDAMENTO
+     ===================================================== */
 
   if (
     S.tid &&
@@ -2639,21 +2958,10 @@ async function init() {
         );
 
 
-      /* -----------------------------------------
-         BACKEND DIZ QUE JÁ FINALIZOU
-         ----------------------------------------- */
-
       if (
         r &&
         r.status === "finalizada"
       ) {
-
-        /*
-         * Não mostramos automaticamente.
-         *
-         * O usuário precisa fazer login
-         * novamente para acessar o resultado.
-         */
 
         limparLocal();
 
@@ -2662,10 +2970,6 @@ async function init() {
         return;
       }
 
-
-      /* -----------------------------------------
-         TENTATIVA AINDA EM ANDAMENTO
-         ----------------------------------------- */
 
       if (
         r &&
@@ -2704,11 +3008,6 @@ async function init() {
       }
 
 
-      /*
-       * Se o backend não reconheceu
-       * a tentativa, limpamos o acesso.
-       */
-
       limparLocal();
 
       mostrarIdentificacao();
@@ -2717,11 +3016,6 @@ async function init() {
 
     } catch (e) {
 
-      /*
-       * Sem internet:
-       * usamos o estado local.
-       */
-
       iniciarProva();
 
       return;
@@ -2729,14 +3023,9 @@ async function init() {
   }
 
 
-  /*
-   * Resultado finalizado salvo localmente:
-   *
-   * NÃO mostrar automaticamente.
-   *
-   * Isso impede que outro usuário no mesmo
-   * computador veja o resultado sem login.
-   */
+  /* =====================================================
+     RESULTADO FINALIZADO
+     ===================================================== */
 
   if (
     S.tid &&
