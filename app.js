@@ -1,4 +1,4 @@
-```javascript
+javascript
 // ESTUDO DIRIGIDO DENTÍSTICA — lógica do frontend.
 // O gabarito e o cálculo da nota ficam no Apps Script.
 // Aqui há interface, cronômetro, autosave, eventos e envio.
