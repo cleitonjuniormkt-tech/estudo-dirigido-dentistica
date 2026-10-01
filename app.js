@@ -756,7 +756,7 @@ async function iniciarNovaTentativa() {
           matricula:
             S.aluno.matricula,
 
-          aceite: true,
+          aceite_termos: true,
 
           versao_termos:
             CONFIG.VERSAO_TERMOS
